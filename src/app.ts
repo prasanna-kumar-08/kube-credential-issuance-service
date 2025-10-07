@@ -49,13 +49,22 @@ async function initDB(): Promise<Database<sqlite3.Database, sqlite3.Statement>> 
     `CREATE TABLE IF NOT EXISTS credentials (
       id TEXT PRIMARY KEY,
       credential TEXT NOT NULL,
-      issuedAt TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT '${CredentialStatus.ISSUED}'
+      issuedAt TEXT NOT NULL
     )`
   );
 
+  const pragma = await dbConnection.all(`PRAGMA table_info(credentials)`);
+  const hasStatus = pragma.some((col) => col.name === 'status');
+
+  if (!hasStatus) {
+    await dbConnection.exec(
+      `ALTER TABLE credentials ADD COLUMN status TEXT NOT NULL DEFAULT '${CredentialStatus.ISSUED}'`
+    );
+  }
+
   return dbConnection;
 }
+
 
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
