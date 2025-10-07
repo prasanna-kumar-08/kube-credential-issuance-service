@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: issuance-service
+  labels:
+    app: issuance
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: issuance
+  template:
+    metadata:
+      labels:
+        app: issuance
+    spec:
+      containers:
+      - name: issuance-container
+        image: your-dockerhub-username/issuance-service:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: WORKER_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 20
