@@ -6,6 +6,10 @@
     "rootDir": "src",
     "strict": true,
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true
-  }
+    "forceConsistentCasingInFileNames": true,
+    "lib": ["ES2020", "DOM"],
+    "types": ["node", "jest"],
+    // other options
+  },
+  "include": ["src/**/*", "src/**/*.test.ts"]
 }
