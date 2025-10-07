@@ -1,6 +1,7 @@
 import express from 'express';
 import sqlite3 from 'sqlite3';
-import { open } from 'sqlite';
+import { open, Database } from 'sqlite';
+
 
 const app = express();
 app.use(express.json());
@@ -8,15 +9,13 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const WORKER_ID = process.env.WORKER_ID || 'worker-1';
 
-let db: sqlite3.Database;
-
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
+let db: Database<sqlite3.Database, sqlite3.Statement>;
 
-// Initialize SQLite DB and table
-async function initDB() {
+async function initDB(): Promise<Database<sqlite3.Database, sqlite3.Statement>> {
   const dbConnection = await open({
     filename: './credentials.db',
     driver: sqlite3.Database
@@ -67,7 +66,7 @@ app.post('/issue', async (req, res) => {
       credentialId: credential.id
     });
   } catch (err) {
-    res.status(500).json({ message: 'Internal Server Error', error: err.message });
+    res.status(500).json({ message: 'Internal Server Error', error: (err as Error).message });
   }
 });
 
@@ -78,3 +77,5 @@ app.post('/issue', async (req, res) => {
     console.log(`Credential Issuance Service running on port ${PORT}, worker: ${WORKER_ID}`);
   });
 })();
+
+export { app, initDB };
