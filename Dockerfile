@@ -9,7 +9,7 @@ RUN npm install -D \
     @types/jest \
     @types/supertest
 
-RUN npm install --production \
+RUN npm install \
     && npm install -g typescript pm2 @nestjs/cli
 
 COPY . .
