@@ -2,6 +2,27 @@ import express from 'express';
 import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 
+// Enum for credential status
+enum CredentialStatus {
+  ISSUED = 'issued',
+  REVOKED = 'revoked',
+  EXPIRED = 'expired',
+}
+
+// DTO for incoming credential issue request
+interface CredentialDTO {
+  id: string;
+  data: Record<string, any>;
+  status?: CredentialStatus;
+}
+
+// Stored credential DB schema
+interface StoredCredential {
+  id: string;
+  credential: string; // JSON string
+  issuedAt: string;
+  status: CredentialStatus;
+}
 
 const app = express();
 app.use(express.json());
@@ -9,61 +30,98 @@ app.use(express.json());
 const PORT = process.env.PORT || 3000;
 const WORKER_ID = process.env.WORKER_ID || 'worker-1';
 
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
-
 let db: Database<sqlite3.Database, sqlite3.Statement>;
 
 async function initDB(): Promise<Database<sqlite3.Database, sqlite3.Statement>> {
   const dbConnection = await open({
     filename: './credentials.db',
-    driver: sqlite3.Database
+    driver: sqlite3.Database,
   });
 
   await dbConnection.exec(
     `CREATE TABLE IF NOT EXISTS credentials (
       id TEXT PRIMARY KEY,
-      credential JSON NOT NULL,
-      issuedAt TEXT NOT NULL
+      credential TEXT NOT NULL,
+      issuedAt TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT '${CredentialStatus.ISSUED}'
     )`
   );
 
   return dbConnection;
 }
 
+app.get('/health', (req, res) => {
+  res.status(200).send('OK');
+});
+
 app.post('/issue', async (req, res) => {
   try {
-    const credential = req.body;
+    const credential: CredentialDTO = req.body;
 
     if (!credential.id) {
       return res.status(400).json({ message: 'Credential must have an id field' });
     }
 
-    // Check if credential already issued
-    const existing = await db.get('SELECT * FROM credentials WHERE id = ?', credential.id);
+    credential.status = credential.status || CredentialStatus.ISSUED;
+
+    const existing: StoredCredential | undefined = await db.get(
+      'SELECT * FROM credentials WHERE id = ?',
+      credential.id
+    );
+
     if (existing) {
       return res.status(200).json({
         message: 'Credential already issued',
         issuedBy: WORKER_ID,
-        credentialId: credential.id
+        credentialId: credential.id,
+        status: existing.status,
       });
     }
 
-    // Issue new credential
     const issuedAt = new Date().toISOString();
+
     await db.run(
-      'INSERT INTO credentials (id, credential, issuedAt) VALUES (?, ?, ?)',
+      'INSERT INTO credentials (id, credential, issuedAt, status) VALUES (?, ?, ?, ?)',
       credential.id,
-      JSON.stringify(credential),
-      issuedAt
+      JSON.stringify(credential.data),
+      issuedAt,
+      credential.status
     );
 
     res.status(201).json({
       message: 'Credential issued',
       issuedBy: WORKER_ID,
       issuedAt,
-      credentialId: credential.id
+      credentialId: credential.id,
+      status: credential.status,
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Internal Server Error', error: (err as Error).message });
+  }
+});
+
+// New endpoint to fetch credential by ID for verification service
+app.get('/credentials/:id', async (req, res) => {
+  try {
+    const id = req.params.id;
+
+    const credentialRecord: StoredCredential | undefined = await db.get(
+      'SELECT * FROM credentials WHERE id = ?',
+      id
+    );
+
+    if (!credentialRecord) {
+      return res.status(404).json({ message: 'Credential not found' });
+    }
+
+    // Parse stored JSON string back to object
+    const credentialData = JSON.parse(credentialRecord.credential);
+
+    res.status(200).json({
+      credentialId: credentialRecord.id,
+      issuedAt: credentialRecord.issuedAt,
+      status: credentialRecord.status,
+      data: credentialData,
     });
   } catch (err) {
     res.status(500).json({ message: 'Internal Server Error', error: (err as Error).message });
@@ -78,4 +136,4 @@ app.post('/issue', async (req, res) => {
   });
 })();
 
-export { app, initDB };
+export { app, initDB, CredentialDTO, CredentialStatus, StoredCredential };
