@@ -1,6 +1,8 @@
 import express from 'express';
 import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
+const cors = require('cors');
+
 
 // Enum for credential status
 enum CredentialStatus {
@@ -26,8 +28,13 @@ interface StoredCredential {
 
 const app = express();
 app.use(express.json());
+app.use(cors({
+  origin: process.env.FE_URL || 'https://your-frontend-domain.onrender.com', // your React frontend URL
+  methods: ['GET', 'POST', 'PUT', 'DELETE'], // allowed HTTP methods
+  credentials: true, // if you use cookies/auth headers
+}));
 
-const PORT = process.env.PORT || 3000;
+const PORT = 5000;
 const WORKER_ID = process.env.WORKER_ID || 'worker-1';
 
 let db: Database<sqlite3.Database, sqlite3.Statement>;
