@@ -1,0 +1,13 @@
+spec:
+  containers:
+  - name: issuance-container
+    image: your-dockerhub-username/issuance-service:latest
+    ports:
+    - containerPort: 3000
+    resources:
+      requests:
+        cpu: "500m"
+        memory: "256Mi"
+      limits:
+        cpu: "1"
+        memory: "512Mi"
